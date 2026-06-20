@@ -1,7 +1,7 @@
 ```markdown
 # High-Throughput Event-Driven Microservices E-Commerce Cluster
 
-<p inline>
+<p align="left">
   <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
   <img src="https://img.shields.io/badge/RabbitMQ-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white" alt="RabbitMQ" />
@@ -63,7 +63,6 @@ This platform uses asynchronous event-driven patterns to decouple frontend API t
                                                        └─────────────────────────┘
 
 ```
-
 
 ---
 
@@ -172,7 +171,5 @@ You can query, monitor, and interact with every microservice layer and monitorin
 | **Prometheus Telemetry Engine** | `http://localhost:9090` | Time-Series Target Scraping Health Status |
 | **RabbitMQ Management Dashboard** | `http://localhost:15672` | Real-time Message Broker Queue Monitors |
 | **Saga Worker Telemetry Channel** | `http://localhost:3002/metrics` | Raw Asynchronous Worker Metric Streams |
-
-```
 
 ```
