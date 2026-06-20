@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  # --- INFRASTRUCTURE CORE DRIVERS ---
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: ecommerce_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # --- EXTRACTED APPLICATION MICROSERVICES ---
+  api-gateway:
+    build:
+      context: .
+      target: api_service
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - JWT_SECRET=a_super_dense_and_unbreakable_secret_string_123!
+      - DATABASE_URL=postgres://admin:secretpassword@postgres:5432/ecommerce_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JAEGER_HOST=jaeger             # <-- ADD
+      - OTEL_SERVICE_NAME=api-gateway  # <-- ADD
+    depends_on:
+      - postgres
+      - redis
+      - jaeger
+
+  outbox-relay:
+    build:
+      context: .
+      target: outbox_service
+    environment:
+      - JWT_SECRET=a_super_dense_and_unbreakable_secret_string_123!
+      - DATABASE_URL=postgres://admin:secretpassword@postgres:5432/ecommerce_db
+      - RABBIT_HOST=rabbitmq
+      - JAEGER_HOST=jaeger                # <-- ADD
+      - OTEL_SERVICE_NAME=outbox-relayer  # <-- ADD
+    depends_on:
+      - postgres
+      - rabbitmq
+      - jaeger
+
+  saga-workers:
+    build:
+      context: .
+      target: worker_service
+    ports:
+      - "3002:3000"
+    environment:
+      - JWT_SECRET=a_super_dense_and_unbreakable_secret_string_123!
+      - DATABASE_URL=postgres://admin:secretpassword@postgres:5432/ecommerce_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBIT_HOST=rabbitmq
+      - JAEGER_HOST=jaeger                 # <-- ADD
+      - OTEL_SERVICE_NAME=saga-worker-ops  # <-- ADD
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+      - jaeger
+     
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    depends_on:
+      - api-gateway
+      - outbox-relay
+      - saga-workers
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    ports:
+      - "3001:3000" # Mapping Grafana's internal port 3000 to your host machine's port 3001
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+  
+  jaeger:
+    image: jaegertracing/all-in-one:1.47
+    ports:
+      - "16686:16686" # The frontend dashboard visualization interface
+      - "4318:4318"  # The OTLP HTTP receiver port where our Node apps send tracing packets
+    volumes:
+      - jaeger_data:/tmp
+    depends_on:
+      - rabbitmq
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:
+  jaeger_data: # <-- Append this volume
+
