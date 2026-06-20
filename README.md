@@ -1,4 +1,3 @@
-```markdown
 # High-Throughput Event-Driven Microservices E-Commerce Cluster
 
 <p align="left">
