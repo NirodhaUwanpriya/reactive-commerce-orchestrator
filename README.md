@@ -16,106 +16,137 @@ A production-grade, highly resilient distributed system architected using Node.j
 ## 🗺️ Architectural Topology & Event Mesh
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'background': '#0d1117', 'primaryColor': '#1e293b', 'edgeLabelBackground':'#161b22'}}}%%
 flowchart TD
 
-subgraph group_execution["Execution modes"]
-  node_api_entrypoint["API entrypoint<br/>http runtime<br/>[api.ts]"]
-  node_workers_entrypoint["Workers entrypoint<br/>consumer runtime<br/>[workers.ts]"]
-  node_outbox_entrypoint["Outbox entrypoint<br/>relay runtime<br/>[outbox.ts]"]
-end
+  %% ==========================================================
+  %% 1. SYSTEM LAYERS & SUBGRAPHS (STACKED VERTICALLY)
+  %% ==========================================================
+  
+  subgraph group_execution["1. Execution Entrypoints"]
+    node_api_entrypoint["API Entrypoint<br/>http runtime<br/>[api.ts]"]
+    node_workers_entrypoint["Workers Entrypoint<br/>consumer runtime<br/>[workers.ts]"]
+    node_outbox_entrypoint["Outbox Entrypoint<br/>relay runtime<br/>[outbox.ts]"]
+  end
 
-subgraph group_domains["Domain modules"]
-  node_users["Users<br/>feature module<br/>[user.routes.ts]"]
-  node_products["Products<br/>feature module<br/>[product.routes.ts]"]
-  node_cart["Cart<br/>feature module<br/>[cart.routes.ts]"]
-  node_orders["Orders<br/>feature module<br/>[order.routes.ts]"]
-  node_payments["Payments<br/>feature module<br/>[payment.routes.ts]"]
-  node_notifications["Notifications<br/>async module"]
-end
+  subgraph group_shared["2. Shared Architecture Core"]
+    node_server["Server Host<br/>[server.ts]"]
+    node_auth_middleware["Auth Guard<br/>[auth.middleware.ts]"]
+    node_db_pool[("Postgres Pool<br/>[pool.ts]")]
+    node_redis[("Redis Cache<br/>[redis.ts]")]
+    node_queue["Message Broker API<br/>[queue.ts]"]
+    node_outbox_processor["Outbox Relay<br/>event loop"]
+    node_order_saga{{"Order Saga<br/>Orchestrator<br/>[order.saga.ts]"}}
+    node_metrics["Metrics Agent<br/>[metrics.ts]"]
+    node_tracer["Tracer Agent<br/>[tracer.ts]"]
+  end
 
-subgraph group_shared["Shared core"]
-  node_server["Server<br/>http host<br/>[server.ts]"]
-  node_auth_middleware["Auth guard<br/>middleware<br/>[auth.middleware.ts]"]
-  node_db_pool[("Postgres pool<br/>sql persistence<br/>[pool.ts]")]
-  node_redis[("Redis cache<br/>volatile state<br/>[redis.ts]")]
-  node_queue["Message broker<br/>amqp broker<br/>[queue.ts]"]
-  node_outbox_processor["Outbox relay<br/>event relay"]
-  node_order_saga{{"Order saga<br/>orchestration<br/>[order.saga.ts]"}}
-  node_metrics["Metrics<br/>telemetry<br/>[metrics.ts]"]
-  node_tracer["Tracer<br/>telemetry<br/>[tracer.ts]"]
-end
+  subgraph group_domains["3. Domain Modules"]
+    node_users["Users Module<br/>[user.routes.ts]"]
+    node_products["Products Module<br/>[product.routes.ts]"]
+    node_cart["Cart Module<br/>[cart.routes.ts]"]
+    node_orders["Orders Module<br/>[order.routes.ts]"]
+    node_payments["Payments Module<br/>[payment.routes.ts]"]
+    node_notifications["Notifications Worker"]
+  end
 
-subgraph group_runtime["Deployment"]
-  node_postgres[("PostgreSQL<br/>database service<br/>[docker-compose.yml]")]
-  node_rabbitmq["RabbitMQ<br/>broker service<br/>[docker-compose.yml]"]
-  node_redis_service[("Redis<br/>cache service<br/>[docker-compose.yml]")]
-end
+  subgraph group_runtime["4. Infrastructure Deployment"]
+    node_postgres[("PostgreSQL Database<br/>[docker-compose]")]
+    node_redis_service[("Redis Engine<br/>[docker-compose]")]
+    node_rabbitmq["RabbitMQ Broker<br/>[docker-compose]"]
+  end
 
-node_api_entrypoint -->|"starts"| node_server
-node_server -->|"uses"| node_auth_middleware
-node_server -->|"mounts"| node_users
-node_server -->|"mounts"| node_products
-node_server -->|"mounts"| node_cart
-node_server -->|"mounts"| node_orders
-node_server -->|"mounts"| node_payments
-node_users -->|"persists"| node_db_pool
-node_products -->|"reads"| node_db_pool
-node_cart -->|"stores"| node_redis
-node_cart -->|"persists"| node_db_pool
-node_orders -->|"transacts"| node_db_pool
-node_orders -->|"publishes"| node_queue
-node_payments -->|"transacts"| node_db_pool
-node_payments -->|"publishes"| node_queue
-node_workers_entrypoint -->|"consumes"| node_queue
-node_workers_entrypoint -->|"drives"| node_order_saga
-node_order_saga -->|"coordinates"| node_orders
-node_order_saga -->|"coordinates"| node_payments
-node_order_saga -->|"triggers"| node_notifications
-node_outbox_entrypoint -->|"runs"| node_outbox_processor
-node_outbox_processor -->|"reads"| node_db_pool
-node_outbox_processor -->|"publishes"| node_queue
-node_metrics -->|"instruments"| node_server
-node_tracer -->|"instruments"| node_server
-node_tracer -->|"instruments"| node_workers_entrypoint
-node_db_pool -->|"connects"| node_postgres
-node_redis -->|"connects"| node_redis_service
-node_queue -->|"connects"| node_rabbitmq
+  %% ==========================================================
+  %% 2. INVISIBLE STRUCTURAL LAYOUT ANCHORS (PREVENTS STRETCHING)
+  %% ==========================================================
+  group_execution ~~~ group_shared
+  group_shared ~~~ group_domains
+  group_domains ~~~ group_runtime
 
-click node_api_entrypoint "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/entrypoints/api.ts"
-click node_workers_entrypoint "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/entrypoints/workers.ts"
-click node_outbox_entrypoint "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/entrypoints/outbox.ts"
-click node_server "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/server.ts"
-click node_auth_middleware "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/middlewares/auth.middleware.ts"
-click node_db_pool "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/database/pool.ts"
-click node_redis "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/database/redis.ts"
-click node_queue "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/database/queue.ts"
-click node_outbox_processor "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/workers/outbox.processor.ts"
-click node_order_saga "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/saga/order.saga.ts"
-click node_metrics "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/monitoring/metrics.ts"
-click node_tracer "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/monitoring/tracer.ts"
-click node_users "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/users/user.routes.ts"
-click node_products "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/products/product.routes.ts"
-click node_cart "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/cart/cart.routes.ts"
-click node_orders "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/orders/order.routes.ts"
-click node_payments "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/payments/payment.routes.ts"
-click node_notifications "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/notifications/notification.worker.ts"
-click node_postgres "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/docker-compose.yml"
-click node_rabbitmq "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/docker-compose.yml"
-click node_redis_service "https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/docker-compose.yml"
+  %% ==========================================================
+  %% 3. SYSTEM RELATIONSHIPS & TRAFFIC FLOWS
+  %% ==========================================================
+  
+  %% Runtime Ingress
+  node_api_entrypoint -->|"starts"| node_server
+  node_server -->|"uses"| node_auth_middleware
+  
+  %% Middleware Router Mounts
+  node_server -->|"mounts"| node_users
+  node_server -->|"mounts"| node_products
+  node_server -->|"mounts"| node_cart
+  node_server -->|"mounts"| node_orders
+  node_server -->|"mounts"| node_payments
 
-classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
-classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
-classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
-classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
-classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
-classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
-classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
-class node_api_entrypoint,node_workers_entrypoint,node_outbox_entrypoint toneBlue
-class node_users,node_products,node_cart,node_orders,node_payments,node_notifications toneAmber
-class node_server,node_auth_middleware,node_db_pool,node_redis,node_queue,node_outbox_processor,node_order_saga,node_metrics,node_tracer toneMint
-class node_postgres,node_rabbitmq,node_redis_service toneRose
-style group_shared fill:#0d1117,stroke:#34d399,stroke-width:2px
-style group_domains fill:#161b22,stroke:#fbbf24,stroke-width:2px
+  %% Isolated Module Persistance Channels
+  node_users -->|"persists"| node_db_pool
+  node_products -->|"reads"| node_db_pool
+  node_cart -->|"stores"| node_redis
+  node_cart -->|"persists"| node_db_pool
+  node_orders -->|"transacts"| node_db_pool
+  node_orders -->|"publishes"| node_queue
+  node_payments -->|"transacts"| node_db_pool
+  node_payments -->|"publishes"| node_queue
+
+  %% Outbox Async Loop
+  node_outbox_entrypoint -->|"runs"| node_outbox_processor
+  node_outbox_processor -->|"reads"| node_db_pool
+  node_outbox_processor -->|"publishes"| node_queue
+
+  %% Consumer Saga Loops
+  node_workers_entrypoint -->|"consumes"| node_queue
+  node_workers_entrypoint -->|"drives"| node_order_saga
+  
+  node_order_saga -.->|"coordinates"| node_orders
+  node_order_saga -.->|"coordinates"| node_payments
+  node_order_saga -.->|"triggers"| node_notifications
+
+  %% Cross-Cutting Telemetry
+  node_metrics & node_tracer -->|"instruments"| node_server
+  node_tracer -->|"instruments"| node_workers_entrypoint
+
+  %% Physical Database Links
+  node_db_pool -->|"connects"| node_postgres
+  node_redis -->|"connects"| node_redis_service
+  node_queue -->|"connects"| node_rabbitmq
+
+  %% ==========================================================
+  %% 4. SOURCE REPOSITORY HYPERLINKS
+  %% ==========================================================
+  click node_api_entrypoint "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/entrypoints/api.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/entrypoints/api.ts)"
+  click node_workers_entrypoint "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/entrypoints/workers.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/entrypoints/workers.ts)"
+  click node_outbox_entrypoint "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/entrypoints/outbox.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/entrypoints/outbox.ts)"
+  click node_server "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/server.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/server.ts)"
+  click node_auth_middleware "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/middlewares/auth.middleware.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/middlewares/auth.middleware.ts)"
+  click node_db_pool "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/database/pool.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/database/pool.ts)"
+  click node_redis "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/database/redis.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/database/redis.ts)"
+  click node_queue "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/database/queue.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/database/queue.ts)"
+  click node_outbox_processor "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/workers/outbox.processor.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/workers/outbox.processor.ts)"
+  click node_order_saga "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/saga/order.saga.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/saga/order.saga.ts)"
+  click node_metrics "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/monitoring/metrics.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/monitoring/metrics.ts)"
+  click node_tracer "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/monitoring/tracer.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/shared/monitoring/tracer.ts)"
+  click node_users "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/users/user.routes.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/users/user.routes.ts)"
+  click node_products "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/products/product.routes.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/products/product.routes.ts)"
+  click node_cart "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/cart/cart.routes.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/cart/cart.routes.ts)"
+  click node_orders "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/orders/order.routes.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/orders/order.routes.ts)"
+  click node_payments "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/payments/payment.routes.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/payments/payment.routes.ts)"
+  click node_notifications "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/notifications/notification.worker.ts](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/src/modules/notifications/notification.worker.ts)"
+  click node_postgres "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/docker-compose.yml](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/docker-compose.yml)"
+  click node_rabbitmq "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/docker-compose.yml](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/docker-compose.yml)"
+  click node_redis_service "[https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/docker-compose.yml](https://github.com/nirodhauwanpriya/reactive-commerce-orchestrator/blob/master/docker-compose.yml)"
+
+  %% ==========================================================
+  %% 5. CUSTOM NEON THEME CLASSES
+  %% ==========================================================
+  classDef toneBlue fill:#1e293b,stroke:#38bdf8,stroke-width:1.5px,color:#f8fafc
+  classDef toneAmber fill:#1e293b,stroke:#fbbf24,stroke-width:1.5px,color:#f8fafc
+  classDef toneMint fill:#1e293b,stroke:#34d399,stroke-width:1.5px,color:#f8fafc
+  classDef toneRose fill:#1e293b,stroke:#f43f5e,stroke-width:1.5px,color:#f8fafc
+
+  class node_api_entrypoint,node_workers_entrypoint,node_outbox_entrypoint toneBlue
+  class node_users,node_products,node_cart,node_orders,node_payments,node_notifications toneAmber
+  class node_server,node_auth_middleware,node_db_pool,node_redis,node_queue,node_outbox_processor,node_order_saga,node_metrics,node_tracer toneMint
+  class node_postgres,node_rabbitmq,node_redis_service toneRose
 ```
 
 This platform uses asynchronous event-driven patterns to decouple frontend API traffic from heavy background transactional lifecycles.
