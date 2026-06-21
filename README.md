@@ -16,7 +16,6 @@ A production-grade, highly resilient distributed system architected using Node.j
 ## 🗺️ Architectural Topology & Event Mesh
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'background': '#0d1117', 'primaryColor': '#1e293b'}}}%%
 flowchart TD
 
 subgraph group_execution["Execution modes"]
