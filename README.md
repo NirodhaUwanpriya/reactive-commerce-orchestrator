@@ -15,6 +15,10 @@ A production-grade, highly resilient distributed system architected using Node.j
 
 ## 🗺️ Architectural Topology & Event Mesh
 
+<p align="center">
+  <img src="./assets/reactive-commerce-orchestrator.png" alt="Diagram" width="100%" />
+</p>
+
 This platform uses asynchronous event-driven patterns to decouple frontend API traffic from heavy background transactional lifecycles.
 
 ```text
