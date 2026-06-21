@@ -114,6 +114,8 @@ class node_api_entrypoint,node_workers_entrypoint,node_outbox_entrypoint toneBlu
 class node_users,node_products,node_cart,node_orders,node_payments,node_notifications toneAmber
 class node_server,node_auth_middleware,node_db_pool,node_redis,node_queue,node_outbox_processor,node_order_saga,node_metrics,node_tracer toneMint
 class node_postgres,node_rabbitmq,node_redis_service toneRose
+style group_shared fill:#0d1117,stroke:#34d399,stroke-width:2px
+style group_domains fill:#161b22,stroke:#fbbf24,stroke-width:2px
 ```
 
 This platform uses asynchronous event-driven patterns to decouple frontend API traffic from heavy background transactional lifecycles.
